@@ -40,10 +40,11 @@ export const consumeAllKeyValueArgs = (args: string[], key: string): string[] =>
     const matches = [];
     const pattern = `${key}=[^ ]*`;
     if (args && key) {
-        for (let i = 0; i < args.length; i++) {
-            const arg = args[i];
+        const tmpArgs = [...args];
+        for (let i = 0; i < tmpArgs.length; i++) {
+            const arg = tmpArgs[i];
             if (arg.match(pattern)) {
-                args.splice(i, 1);
+                args.splice(i - (tmpArgs.length - args.length), 1);
                 matches.push(arg.substr(key.length + 1));
             }
         }
