@@ -7,7 +7,7 @@ import * as T from './types';
 export const CONFIG_FILENAME = 'fv.config.json';
 
 const argsToStr = (...args: any[]): string => args.reduce((acc, a) => `${acc} ${a}`, '').substr(1);
-const pathToStr = (path: string): string => chalk.gray(path);
+const pathToStr = (p: string): string => chalk.gray(p);
 export const log = (...args: any[]) => console.log(...args);
 export const logInstruction = (...args: any[]) => console.log(chalk.cyan(`> ${argsToStr(...args)}`));
 export const logSuccess = (...args: any[]) => console.log(chalk.green(`SUCCESS: ${argsToStr(...args)}`));
@@ -150,13 +150,13 @@ const getSrcPath = (
             const variantsFound = filePaths
                 .map((filePath) => ({ abs: filePath, ...path.parse(filePath) }))
                 .filter(({ base }) => base !== CONFIG_FILENAME)
-                .map(({ name, abs }) => ({ name, abs }));
+                .map(({ name: pathName, abs }) => ({ variantName: pathName, abs }));
 
             if (verbose) {
-                log('Found variants', variantsFound.map(({ name }) => name), 'for config', `"${name}".`);
+                log('Found variants', variantsFound.map(({ variantName }) => variantName), 'for config', `"${name}".`);
             }
 
-            const variantNames = variantsFound.map(({ name }) => name);
+            const variantNames = variantsFound.map(({ variantName }) => variantName);
 
             let variantToUse = name in overrides ? overrides[name] : variant;
             if (!variantToUse) {
@@ -171,8 +171,8 @@ const getSrcPath = (
                 variantToUse = config.default;
             }
 
-            if (variantToUse && variantsFound.find(({ name }) => name === variantToUse)) {
-                const filePath = variantsFound.find(({ name }) => name === variantToUse)!.abs;
+            if (variantToUse && variantsFound.find(({ variantName }) => variantName === variantToUse)) {
+                const filePath = variantsFound.find(({ variantName }) => variantName === variantToUse)!.abs;
                 resolve(filePath);
             } else {
                 reject(`Can't find a file variant to use for config "${name}".`);
