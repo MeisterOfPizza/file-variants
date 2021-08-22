@@ -5,7 +5,7 @@ import * as T from './types';
 
 const main = () => {
     const [,, ...args] = process.argv;
-    let valueVariant: T.FVVariant | null = null;
+    let valueVariant: T.Variant | null = null;
     const optionPath           = path.resolve(process.cwd(), utils.consumeKeyValueArg(args, 'path') || '');
     const optionInclude        = utils.consumeKeyValueArg(args, 'include');
     const optionExclude        = utils.consumeKeyValueArg(args, 'exclude');
@@ -17,40 +17,40 @@ const main = () => {
         valueVariant = args[0];
     }
 
-    const includeNames = (optionInclude?.split(',') ?? []) as T.FVName[];
-    const excludeNames = (optionExclude?.split(',') ?? []) as T.FVName[];
+    const includeInputs = (optionInclude?.split(',') ?? []) as T.InputName[];
+    const excludeInputs = (optionExclude?.split(',') ?? []) as T.InputName[];
 
     const overrides = optionOverrides.reduce((acc, nameVariantStr) => {
         const [name, variant] = nameVariantStr.split(',');
         acc[name] = variant;
         return acc;
-    }, {} as T.FVOverrides);
+    }, {} as T.Overrides);
 
-    const replaces = optionReplaces.reduce((acc, nameKeywordReplacmentStr) => {
+    const replacements = optionReplaces.reduce((acc, nameKeywordReplacmentStr) => {
         const [name, keyword, replacement] = nameKeywordReplacmentStr.split(',');
         if (!(name in acc)) {
             acc[name] = {};
         }
         acc[name][keyword] = replacement;
         return acc;
-    }, {} as T.FVReplaces);
+    }, {} as T.Replacements);
 
-    const globalReplaces = optionGlobalReplaces.reduce((acc, keywordReplacmentStr) => {
+    const globalReplacements = optionGlobalReplaces.reduce((acc, keywordReplacmentStr) => {
         const [keyword, replacement] = keywordReplacmentStr.split(',');
         acc[keyword] = replacement;
         return acc;
-    }, {} as T.FVGlobalReplaces);
+    }, {} as T.GlobalReplacements);
 
     if (optionVerbose) {
         utils.log();
         utils.log('Script "build" is running with the following values (and options*):');
         utils.log('variant =', valueVariant);
         utils.log('path* =', optionPath);
-        utils.log('include* =', includeNames);
-        utils.log('exclude* =', excludeNames);
+        utils.log('include* =', includeInputs);
+        utils.log('exclude* =', excludeInputs);
         utils.log('overrides* =', overrides);
-        utils.log('replaces* =', replaces);
-        utils.log('global-replaces* =', globalReplaces);
+        utils.log('replaces* =', replacements);
+        utils.log('global-replaces* =', globalReplacements);
         utils.log('verbose* =', optionVerbose);
         utils.log();
     }
@@ -63,15 +63,15 @@ const main = () => {
                 utils.build(
                     configPath,
                     valueVariant,
-                    includeNames,
-                    excludeNames,
+                    includeInputs,
+                    excludeInputs,
                     overrides,
-                    replaces,
-                    globalReplaces,
+                    replacements,
+                    globalReplacements,
                     optionVerbose,
                 )
-                    .then(({ name, absoluteDestPath }) => utils.logInstruction('Created file variant of', `"${name}"`, 'at', absoluteDestPath))
-                    .catch((err) => utils.logError('Failed creating file variant, reason:', err))
+                    .then(({ name, absoluteDestPath }) => utils.logInstruction('Created output of input', `"${name}"`, 'at', absoluteDestPath))
+                    .catch((err) => utils.logError('Failed creating output, reason:', err))
                     .finally(() => {
                         if (optionVerbose) {
                             utils.log();

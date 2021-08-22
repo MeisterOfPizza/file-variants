@@ -1,40 +1,40 @@
-export type FVName = string;
-export type FVVariant = string;
+export type InputName = string;
+export type Variant = string;
 
-export type FVConfigPath = string;
-export type FVFilePath = string;
+export type ConfigPath = string;
+export type OutputPath = string;
 
-export interface FVConfig {
-    name?: FVName;
+export interface Config {
+    name?: InputName;
     filename?: string;
     encoding?: string;
     outPath?: string;
-    default: FVVariant;
+    default: Variant;
     fallbacks?: {
-        [variant: string]: FVVariant;
+        [variant: string]: Variant;
     };
-    useGlobalReplaces?: boolean | string[];
+    useGlobalReplacements?: boolean | string[];
 }
 
-export interface FVBuildInfo {
-    name: FVName;
+export interface BuildInfo {
+    name: InputName;
     filename: string;
     encoding: string;
     absoluteSrcPath: string;
     absoluteDestPath: string;
-    config: FVConfig;
+    config: Config;
 }
 
-export interface FVOverrides {
-    [name: string]: FVVariant;
+export interface Overrides {
+    [name: string]: Variant;
 }
 
-export interface FVReplaces {
+export interface Replacements {
     [name: string]: {
         [keyword: string]: string;
     };
 }
 
-export interface FVGlobalReplaces {
+export interface GlobalReplacements {
     [keyword: string]: string;
 }

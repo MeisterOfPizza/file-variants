@@ -4,15 +4,16 @@ import { glob } from 'glob';
 import chalk from 'chalk';
 import * as T from './types';
 
-export const CONFIG_FILENAME = 'fv.config.json';
+export const CONFIG_FILENAME = 'fvi.config.json';
 
 const argsToStr = (...args: any[]): string => args.reduce((acc, a) => `${acc} ${a}`, '').substr(1);
 const pathToStr = (p: string): string => chalk.gray(p);
-export const log = (...args: any[]) => console.log(...args);
+
+export const log            = (...args: any[]) => console.log(...args);
 export const logInstruction = (...args: any[]) => console.log(chalk.cyan(`> ${argsToStr(...args)}`));
-export const logSuccess = (...args: any[]) => console.log(chalk.green(`SUCCESS: ${argsToStr(...args)}`));
-export const logWarning = (...args: any[]) => console.log(chalk.yellow(`WARN: ${argsToStr(...args)}`));
-export const logError = (...args: any[]) => console.log(chalk.red(`ERR: ${argsToStr(...args)}`));
+export const logSuccess     = (...args: any[]) => console.log(chalk.green(`SUCCESS: ${argsToStr(...args)}`));
+export const logWarning     = (...args: any[]) => console.log(chalk.yellow(`WARN: ${argsToStr(...args)}`));
+export const logError       = (...args: any[]) => console.log(chalk.red(`ERR: ${argsToStr(...args)}`));
 
 export const consumeFlagArg = (args: string[], flag: string): boolean => {
     const index = args.indexOf(flag);
@@ -23,7 +24,7 @@ export const consumeFlagArg = (args: string[], flag: string): boolean => {
 };
 
 export const consumeKeyValueArg = (args: string[], key: string): string | null => {
-    const pattern = `${key}=[^ ]*`;
+    const pattern = `^${key}=[^ ]*$`;
     if (args && key) {
         for (let i = 0; i < args.length; i++) {
             const arg = args[i];
@@ -38,7 +39,7 @@ export const consumeKeyValueArg = (args: string[], key: string): string | null =
 
 export const consumeAllKeyValueArgs = (args: string[], key: string): string[] => {
     const matches = [];
-    const pattern = `${key}=[^ ]*`;
+    const pattern = `^${key}=[^ ]*$`;
     if (args && key) {
         const tmpArgs = [...args];
         for (let i = 0; i < tmpArgs.length; i++) {
@@ -53,20 +54,20 @@ export const consumeAllKeyValueArgs = (args: string[], key: string): string[] =>
 };
 
 export const build = (
-    configPath: T.FVConfigPath,
-    variant: T.FVVariant | null,
-    include: T.FVName[],
-    exclude: T.FVName[],
-    overrides: T.FVOverrides,
-    replaces: T.FVReplaces,
-    globalReplaces: T.FVGlobalReplaces,
+    configPath: T.ConfigPath,
+    variant: T.Variant | null,
+    include: T.InputName[],
+    exclude: T.InputName[],
+    overrides: T.Overrides,
+    replacements: T.Replacements,
+    globalReplacements: T.GlobalReplacements,
     verbose: boolean,
-) => new Promise<T.FVBuildInfo>((resolve, reject) => {
+) => new Promise<T.BuildInfo>((resolve, reject) => {
     getBuildInfo(configPath, variant, include, exclude, overrides, verbose)
         .then((buildInfo) => {
-            buildFile(buildInfo, verbose)
+            buildOutput(buildInfo, verbose)
                 .then(() => {
-                    replaceInFile(buildInfo, replaces, globalReplaces, verbose)
+                    replaceInOutput(buildInfo, replacements, globalReplacements, verbose)
                         .then(() => resolve(buildInfo))
                         .catch(reject);
                 })
@@ -75,17 +76,16 @@ export const build = (
 });
 
 const getBuildInfo = (
-    configPath: T.FVConfigPath,
-    variant: T.FVVariant | null,
-    include: T.FVName[],
-    exclude: T.FVName[],
-    overrides: T.FVOverrides,
+    configPath: T.ConfigPath,
+    variant: T.Variant | null,
+    include: T.InputName[],
+    exclude: T.InputName[],
+    overrides: T.Overrides,
     verbose: boolean,
-) => new Promise<T.FVBuildInfo>((resolve, reject) => {
+) => new Promise<T.BuildInfo>((resolve, reject) => {
     getConfig(configPath, verbose)
         .then((config) => {
             const name = config.name || path.basename(path.resolve(configPath, '../'));
-
             if ((!include.length || include.includes(name)) && !exclude.includes(name)) {
                 const filename = config.filename || name;
                 const encoding = config.encoding || 'utf8';
@@ -100,53 +100,54 @@ const getBuildInfo = (
                             absoluteSrcPath: srcPath,
                             absoluteDestPath: destPath,
                             config,
-                        } as T.FVBuildInfo);
+                        } as T.BuildInfo);
                     })
                     .catch(reject);
             } else {
-                reject(`Did not create file variant for "${name}" because it wasn't/was included/excluded.`);
+                reject(`Did not create output for "${name}" because it wasn't included / was excluded.`);
             }
         })
         .catch(reject);
 });
 
 const getConfig = (
-    configPath: T.FVConfigPath,
+    configPath: T.ConfigPath,
     verbose: boolean,
-) => new Promise<T.FVConfig>((resolve, reject) => {
+) => new Promise<T.Config>((resolve, reject) => {
     if (verbose) {
-        log('Running readFile at', pathToStr(configPath));
+        log(`Running readFile of config at ${pathToStr(configPath)}.`);
     }
     fs.promises.readFile(configPath, { encoding: 'utf8' })
         .then((data) => {
             if (verbose) {
-                logSuccess(`readFile at ${pathToStr(configPath)} succeeded.`);
+                logSuccess(`readFile of config at ${pathToStr(configPath)} succeeded.`);
             }
-            const config = JSON.parse(data) as T.FVConfig;
+            const config = JSON.parse(data) as T.Config;
             resolve(config);
         })
         .catch((err) => {
             if (verbose) {
-                logError(`readFile at ${pathToStr(configPath)} failed, reason: ${err}.`);
+                logError(`readFile of config at ${pathToStr(configPath)} failed, reason: ${err}.`)
             }
-            reject(`Reading config at ${pathToStr(configPath)} failed, reason: ${err}.`);
+            reject(`Can't read config at ${pathToStr(configPath)}.`);
         });
 });
 
 const getSrcPath = (
-    configPath: T.FVConfigPath,
-    config: T.FVConfig,
-    name: T.FVName,
-    variant: T.FVVariant | null,
-    overrides: T.FVOverrides,
+    configPath: T.ConfigPath,
+    config: T.Config,
+    name: T.InputName,
+    variant: T.Variant | null,
+    overrides: T.Overrides,
     verbose: boolean,
-) => new Promise<T.FVFilePath>((resolve, reject) => {
-    glob(`${path.resolve(configPath, '..')}/*`, (err, filePaths) => {
+) => new Promise<T.OutputPath>((resolve, reject) => {
+    const searchPath = `${path.resolve(configPath, '..')}/*`;
+    glob(searchPath, (err, filePaths) => {
         if (err) {
             if (verbose) {
-                logError(`Searching for files at config "${name}" failed, reason: ${err}.`);
+                logError(`glob(${searchPath}) for files in input "${name}" failed, reason: ${err}.`);
             }
-            reject(`Searching for files at config "${name}" failed, reason: ${err}.`);
+            reject(`Searching for files in input "${name}" failed, reason: ${err}.`);
         } else {
             const variantsFound = filePaths
                 .map((filePath) => ({ abs: filePath, ...path.parse(filePath) }))
@@ -154,7 +155,7 @@ const getSrcPath = (
                 .map(({ name: pathName, abs }) => ({ variantName: pathName, abs }));
 
             if (verbose) {
-                log('Found variants', variantsFound.map(({ variantName }) => variantName), 'for config', `"${name}".`);
+                log('Found variants', variantsFound.map(({ variantName }) => variantName), 'for input', `"${name}".`);
             }
 
             const variantNames = variantsFound.map(({ variantName }) => variantName);
@@ -176,25 +177,25 @@ const getSrcPath = (
                 const filePath = variantsFound.find(({ variantName }) => variantName === variantToUse)!.abs;
                 resolve(filePath);
             } else {
-                reject(`Can't find a file variant to use for config "${name}".`);
+                reject(`Can't find a file variant to use for input "${name}".`);
             }
         }
     });
 });
 
-const buildFile = (
-    buildInfo: T.FVBuildInfo,
+const buildOutput = (
+    buildInfo: T.BuildInfo,
     verbose: boolean,
 ) => new Promise((resolve, reject) => {
     const dirPath = path.resolve(buildInfo.absoluteDestPath, '..');
     if (verbose) {
-        log(`Running mkdir (recursive) for ${pathToStr(dirPath)}.`);
+        log(`Running mkdir (recursive) for output at ${pathToStr(dirPath)}.`);
     }
     fs.promises.mkdir(dirPath, { recursive: true })
         .then(() => {
             if (verbose) {
-                logSuccess(`mkdir (recursive) for ${pathToStr(dirPath)} succeeded.`);
-                log(`Running copyFile from ${pathToStr(buildInfo.absoluteSrcPath)} to ${pathToStr(buildInfo.absoluteDestPath)}.`);
+                logSuccess(`mkdir (recursive) for output at ${pathToStr(dirPath)} succeeded.`);
+                log(`Running copyFile (file-variant -> output) from ${pathToStr(buildInfo.absoluteSrcPath)} to ${pathToStr(buildInfo.absoluteDestPath)}.`);
             }
             fs.promises.copyFile(buildInfo.absoluteSrcPath, buildInfo.absoluteDestPath)
                 .then(() => {
@@ -207,79 +208,96 @@ const buildFile = (
         })
         .catch((err) => {
             if (verbose) {
-                logError(`mkdir (recursive) for ${pathToStr(dirPath)} failed, reason: ${err}.`);
+                logError(`mkdir (recursive) for output at ${pathToStr(dirPath)} failed, reason: ${err}.`);
             }
             reject(`Can't create directory at ${pathToStr(dirPath)}, reason: ${err}.`);
         });
 });
 
-export const replaceInFile = (
-    buildInfo: T.FVBuildInfo,
-    replaces: T.FVReplaces,
-    globalReplaces: T.FVGlobalReplaces,
+export const replaceInOutput = (
+    buildInfo: T.BuildInfo,
+    replacements: T.Replacements,
+    globalReplacements: T.GlobalReplacements,
     verbose: boolean,
 ) => new Promise((resolve, reject) => {
-    const filePath = buildInfo.absoluteDestPath;
+    const destPath = buildInfo.absoluteDestPath;
     const encoding = buildInfo.encoding;
-    if (buildInfo.config.useGlobalReplaces || replaces[buildInfo.name]) {
+    if (buildInfo.config.useGlobalReplacements || replacements[buildInfo.name]) {
+        if (verbose) {
+            log(`Running readFile of output at ${pathToStr(destPath)}.`);
+        }
         // @ts-ignore
-        fs.promises.readFile(filePath, { encoding })
+        fs.promises.readFile(destPath, { encoding })
             .then((data) => {
                 if (encoding === 'ascii'
                     || encoding === 'utf8'
                     || encoding === 'utf-8'
                     || encoding === 'latin1'
                     || encoding === 'utf16le') {
+                    if (verbose) {
+                        log(`Trying to replace in output at ${pathToStr(destPath)}.`);
+                    }
+
                     const foundReplacements = [];
                     // Add all file specific replaces:
-                    if (buildInfo.name in replaces) {
-                        foundReplacements.push(...Object.entries(replaces[buildInfo.name]));
+                    if (buildInfo.name in replacements) {
+                        foundReplacements.push(...Object.entries(replacements[buildInfo.name]));
                     }
                     // Add global replaces:
-                    if (buildInfo.config.useGlobalReplaces) {
-                        const globalReplaceEntries = Object.entries(globalReplaces);
-                        if (buildInfo.config.useGlobalReplaces === true) {
+                    if (buildInfo.config.useGlobalReplacements) {
+                        const globalReplaceEntries = Object.entries(globalReplacements);
+                        if (buildInfo.config.useGlobalReplacements === true) {
                             foundReplacements.push(...globalReplaceEntries);
                         } else {
                             foundReplacements.push(
                                 ...globalReplaceEntries.filter(([keyword]) => (
-                                    buildInfo.config.useGlobalReplaces as string[]).includes(keyword)
+                                    buildInfo.config.useGlobalReplacements as string[]).includes(keyword)
                                 )
                             );
                         }
                     }
+                    let replacementCount = 0;
                     // Replace all occurrences of keyword with replacement:
                     foundReplacements.forEach(([keyword, replacement]) => {
-                        if (verbose) {
-                            log(`Replaced "${keyword}" with "${replacement}" in ${pathToStr(filePath)}.`)
-                        }
+                        const keywordRegExp = new RegExp(keyword, 'gm');
                         // @ts-ignore
-                        data = data.replace(keyword, replacement);
+                        if (keywordRegExp.test(data)) {
+                            if (verbose) {
+                                log(`Replaced "${keyword}" with "${replacement}" in output at ${pathToStr(destPath)}.`)
+                            }
+                            // @ts-ignore
+                            data = data.replace(keywordRegExp, replacement);
+                            replacementCount++;
+                        }
                     });
 
-                    fs.promises.writeFile(filePath, data, { encoding })
+                    fs.promises.writeFile(destPath, data, { encoding })
                         .then(() => {
                             if (verbose) {
-                                logSuccess(`Completed ${foundReplacements.length} replacement(s) in copied file ${pathToStr(filePath)}.`);
+                                logSuccess(`Completed ${replacementCount} replacement(s) in output at ${pathToStr(destPath)}.`);
                             }
                             resolve(null);
                         })
                         .catch((err) => {
-                            reject(`Writing to copied file at ${pathToStr(filePath)} failed, reason: ${err}.`);
+                            if (verbose) {
+                                logError(`writeFile to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
+                            }
+                            reject(`writeFile to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
                         });
                 } else {
+                    logWarning(`Did not replace in output at ${pathToStr(destPath)} because it had the wrong encoding (although still had valid replacements/global-replacements).`);
                     resolve(null);
                 }
             })
             .catch((err) => {
                 if (verbose) {
-                    logError(`readFile at ${pathToStr(filePath)} failed, reason: ${err}.`);
+                    logError(`readFile of output at ${pathToStr(destPath)} failed, reason: ${err}.`);
                 }
-                reject(`Reading from copied file at ${pathToStr(filePath)} failed, reason: ${err}.`);
+                reject(`Reading output of input "${buildInfo.name}" at ${pathToStr(destPath)} failed, reason: ${err}.`);
             });
     } else {
         if (verbose) {
-            log(`Did not replace in copied file ${pathToStr(filePath)}.`);
+            log(`Did not replace in output at ${pathToStr(destPath)}.`);
         }
         resolve(null);
     }
