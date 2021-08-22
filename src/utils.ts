@@ -232,8 +232,7 @@ export const replaceInOutput = (
                 if (encoding === 'ascii'
                     || encoding === 'utf8'
                     || encoding === 'utf-8'
-                    || encoding === 'latin1'
-                    || encoding === 'utf16le') {
+                    || encoding === 'latin1') {
                     if (verbose) {
                         log(`Trying to replace in output at ${pathToStr(destPath)}.`);
                     }

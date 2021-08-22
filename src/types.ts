@@ -1,5 +1,6 @@
 export type InputName = string;
-export type Variant = string;
+export type Variant   = string;
+export type Encoding  = 'utf8' | 'utf-8' | 'ascii' | 'base64' | 'binary' | 'hex' | 'latin1' | 'ucs-2' | 'ucs2' | 'utf16le';
 
 export type ConfigPath = string;
 export type OutputPath = string;
@@ -7,7 +8,7 @@ export type OutputPath = string;
 export interface Config {
     name?: InputName;
     filename?: string;
-    encoding?: string;
+    encoding?: Encoding;
     outPath?: string;
     default: Variant;
     fallbacks?: {
