@@ -10,7 +10,8 @@
     "build": "tsc",
     "lint": "tslint -p tsconfig.json",
     "prepare": "npm run build",
-    "pre-publish": "npm test && npm run lint"
+    "pre-publish": "npm test && npm run lint",
+    "prepare-examples": "cd \"./examples/Example 1\" && npm i && cd .. && cd \"./Example 2\" && npm i"
   },
   "files": [
     "bin"
