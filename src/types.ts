@@ -18,6 +18,16 @@ export interface Config {
     marking?: boolean | string;
 }
 
+export interface GlobalConfig {
+    values?: {
+        variant?: string;
+    };
+    options?: string[];
+    overrides?: {
+        marking?: boolean | string;
+    };
+}
+
 export interface BuildInfo {
     name: InputName;
     outputName: string;
