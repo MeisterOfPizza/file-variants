@@ -9,7 +9,7 @@ const DEFAULT_MARKING = '.fvo';
 export const CONFIG_FILENAME = 'fvi.config.json';
 
 const argsToStr = (...args: any[]): string => args.reduce((acc, a) => `${acc} ${a}`, '').substr(1);
-const pathToStr = (p: string): string => chalk.gray(p);
+export const pathToStr = (p: string): string => chalk.gray(p);
 
 export const log            = (...args: any[]) => console.log(...args);
 export const logInstruction = (...args: any[]) => console.log(chalk.cyan(`> ${argsToStr(...args)}`));
@@ -55,8 +55,20 @@ export const consumeAllKeyValueArgs = (args: string[], key: string): string[] =>
     return matches;
 };
 
+export const getGlobalConfig = (globalConfigPath: T.ConfigPath): T.GlobalConfig | null => {
+    try {
+        const data = fs.readFileSync(globalConfigPath, { encoding: 'utf8' });
+        logInstruction(`Read global config at ${pathToStr(globalConfigPath)}.`);
+        return JSON.parse(data) as T.GlobalConfig;
+    } catch (err) {
+        logError(`Can't read global config at ${pathToStr(globalConfigPath)}, reason: ${err}.`);
+        return null;
+    }
+};
+
 export const build = (
     configPath: T.ConfigPath,
+    globalConfig: T.GlobalConfig,
     variant: T.Variant | null,
     include: T.InputName[],
     exclude: T.InputName[],
@@ -65,7 +77,15 @@ export const build = (
     globalReplacements: T.GlobalReplacements,
     verbose: boolean,
 ) => new Promise<T.BuildInfo>((resolve, reject) => {
-    getBuildInfo(configPath, variant, include, exclude, overrides, verbose)
+    getBuildInfo(
+        configPath,
+        globalConfig,
+        variant,
+        include,
+        exclude,
+        overrides,
+        verbose,
+    )
         .then((buildInfo) => {
             buildOutput(buildInfo, verbose)
                 .then(() => {
@@ -79,13 +99,14 @@ export const build = (
 
 const getBuildInfo = (
     configPath: T.ConfigPath,
+    globalConfig: T.GlobalConfig,
     variant: T.Variant | null,
     include: T.InputName[],
     exclude: T.InputName[],
     overrides: T.Overrides,
     verbose: boolean,
 ) => new Promise<T.BuildInfo>((resolve, reject) => {
-    getConfig(configPath, verbose)
+    getConfig(configPath, globalConfig, verbose)
         .then((config) => {
             const name = config.name || path.basename(path.resolve(configPath, '../'));
             if ((!include.length || include.includes(name)) && !exclude.includes(name)) {
@@ -123,6 +144,7 @@ const getBuildInfo = (
 
 const getConfig = (
     configPath: T.ConfigPath,
+    globalConfig: T.GlobalConfig,
     verbose: boolean,
 ) => new Promise<T.Config>((resolve, reject) => {
     if (verbose) {
@@ -134,7 +156,10 @@ const getConfig = (
                 logSuccess(`readFile of config at ${pathToStr(configPath)} succeeded.`);
             }
             const config = JSON.parse(data) as T.Config;
-            resolve(config);
+            resolve({
+                ...globalConfig.overrides,
+                ...config,
+            } as T.Config);
         })
         .catch((err) => {
             if (verbose) {
