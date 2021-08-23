@@ -7,7 +7,7 @@ export type OutputPath = string;
 
 export interface Config {
     name?: InputName;
-    filename?: string;
+    outputName?: string;
     encoding?: Encoding;
     outPath?: string;
     default: Variant;
@@ -15,11 +15,12 @@ export interface Config {
         [variant: string]: Variant;
     };
     useGlobalReplacements?: boolean | string[];
+    marking?: boolean | string;
 }
 
 export interface BuildInfo {
     name: InputName;
-    filename: string;
+    outputName: string;
     encoding: string;
     absoluteSrcPath: string;
     absoluteDestPath: string;

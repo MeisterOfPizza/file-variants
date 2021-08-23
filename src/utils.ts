@@ -4,6 +4,8 @@ import { glob } from 'glob';
 import chalk from 'chalk';
 import * as T from './types';
 
+const DEFAULT_MARKING = '.fvo';
+
 export const CONFIG_FILENAME = 'fvi.config.json';
 
 const argsToStr = (...args: any[]): string => args.reduce((acc, a) => `${acc} ${a}`, '').substr(1);
@@ -87,15 +89,24 @@ const getBuildInfo = (
         .then((config) => {
             const name = config.name || path.basename(path.resolve(configPath, '../'));
             if ((!include.length || include.includes(name)) && !exclude.includes(name)) {
-                const filename = config.filename || name;
                 const encoding = config.encoding || 'utf8';
                 getSrcPath(configPath, config, name, variant, overrides, verbose)
                     .then((srcPath) => {
+                        let outputName = config.outputName || name;
+                        if (config.marking) {
+                            const marking = typeof config.marking === 'string' ? config.marking : DEFAULT_MARKING;
+                            if (outputName.includes('{marking}')) {
+                                outputName = outputName.replace('{marking}', marking);
+                            } else {
+                                outputName = `${outputName}${marking}`;
+                            }
+                        }
+
                         const extension = path.extname(srcPath);
-                        const destPath  = path.resolve(configPath, '..', config.outPath !== undefined ? config.outPath : '..', `${filename}${extension}`);
+                        const destPath  = path.resolve(configPath, '..', config.outPath !== undefined ? config.outPath : '..', `${outputName}${extension}`);
                         resolve({
                             name,
-                            filename,
+                            outputName,
                             encoding,
                             absoluteSrcPath: srcPath,
                             absoluteDestPath: destPath,
@@ -165,8 +176,10 @@ const getSrcPath = (
                 variantToUse = config.default;
             }
             if (config.fallbacks) {
-                while (variantToUse !== config.default && !variantNames.includes(variantToUse)) {
+                let iLoopBreak = 100;
+                while (iLoopBreak > 0 && variantToUse !== config.default && !variantNames.includes(variantToUse)) {
                     variantToUse = config.fallbacks[variantToUse];
+                    iLoopBreak--;
                 }
             }
             if (!variantNames.includes(variantToUse)) {
