@@ -5,6 +5,6 @@
     "fv-build": "file-variants build"
   },
   "dependencies": {
-    "file-variants": "file:../.."
+    "file-variants": "*"
   }
 }
