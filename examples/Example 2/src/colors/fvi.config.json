@@ -1,0 +1,7 @@
+{
+    "default": "colors_a",
+    "fallbacks": {
+        "foo": "colors_b"
+    },
+    "marking": true
+}
