@@ -1,6 +1,6 @@
 {
   "name": "file-variants",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Create multiple file variants, build with one (and replace within if needed), and deploy. Solves the problem of using multiple somewhat similar files in a sort of multitenant system. Highly configurable and flexible pseudo multitenant file builder.",
   "keywords": [
     "files",
