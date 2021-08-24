@@ -11,6 +11,10 @@
   ],
   "author": "Emil Engelin",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MeisterOfPizza/file-variants.git"
+  },
   "scripts": {
     "test": "jest --config jestconfig.json",
     "build": "tsc",
