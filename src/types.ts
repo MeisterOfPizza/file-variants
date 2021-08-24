@@ -2,8 +2,7 @@ export type InputName = string;
 export type Variant   = string;
 export type Encoding  = 'utf8' | 'utf-8' | 'ascii' | 'base64' | 'binary' | 'hex' | 'latin1' | 'ucs-2' | 'ucs2' | 'utf16le';
 
-export type ConfigPath = string;
-export type OutputPath = string;
+export type Path = string;
 
 export interface Config {
     name?: InputName;
@@ -32,8 +31,8 @@ export interface BuildInfo {
     name: InputName;
     outputName: string;
     encoding: string;
-    absoluteSrcPath: string;
-    absoluteDestPath: string;
+    destDir: string;
+    srcDestPairs: [Path, Path][];
     config: Config;
 }
 

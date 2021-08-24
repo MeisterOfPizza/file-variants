@@ -41,6 +41,10 @@ Now run `npm run fv-build` (or `npx file-variants build`)
     - [1. Before build](#1-before-build-1)
     - [2. Build](#2-build-1)
     - [3. After build](#3-after-build-1)
+  - [Example 3](#example-3)
+    - [1. Before build](#1-before-build-2)
+    - [2. Build](#2-build-2)
+    - [3. After build](#3-after-build-2)
 - [License](#license)
 
 ## Usage
@@ -147,6 +151,8 @@ interface GlobalConfig {
 ```
 
 ## Examples
+The files for each example can be found under [examples/](./examples).
+
 ### Example 1
 You have 3 clients who use your product. You want to keep a shared codebase, where the only difference between these 3 clients is their logo.
 
@@ -163,7 +169,7 @@ You have 3 clients who use your product. You want to keep a shared codebase, whe
 ```
 
 #### 2. Build
-`build foobar`
+`npm run fv-build foobar`
 
 #### 3. After build
 *Logo.png* is now a direct copy of *foobar.png*. You can now always import *Logo.png* instead of checking for the current client or doing lazy imports (which require you to build with all logos included).
@@ -181,7 +187,7 @@ You have 3 clients who use your product. You want to keep a shared codebase, whe
 
 ### Example 2
 1. You use 3 different color.ini [variant-]files.
-2. You build your project with variant *foo*
+2. You build your project with variant *foo*.
 3. You only have colors for *a*, *b*, and *c*.
 4. Variant *foo* should **not** use *a* (default), but *b* as its fallback.
 
@@ -215,7 +221,7 @@ primary=rgba(255, 0, 255, ALPHA_VALUE)
 secondary=rgba(0, 255, 0, ALPHA_VALUE)
 ```
 #### 2. Build
-`build foo replace=colors,ALPHA_VALUE,0.5`
+`npm run fv-build foo replace=colors,ALPHA_VALUE,0.5`
 
 #### 3. After build
 ```
@@ -241,6 +247,71 @@ secondary=rgba(0, 255, 0, 0.5)
 ```.gitignore
 # file-variants outputs
 *.fvo*
+```
+
+### Example 3
+1. You have 3 different splash image resolutions (64x64, 128x128, and 256x256).
+2. Each variant has 3 resolutions (mentioned above).
+3. You build your project with variant *red*.
+4. You want the outputs to be named *splash_RESOLUTION.png*.
+
+#### 1. Before build
+```
+.
++-- _src
+|   +-- _splash
+|       +-- fvi.config.json
+|       +-- red.x64.png
+|       +-- red.x128.png
+|       +-- red.x256.png
+|       +-- green.x64.png
+|       +-- green.x128.png
+|       +-- green.x256.png
+|       +-- blue.x64.png
+|       +-- blue.x128.png
+|       +-- blue.x256.png
+|   ...
+```
+
+fvi.config.json
+```json
+{
+  "default": "red",
+  // {part0} (pattern {part\d*}) means the first part of the
+  // filename after variant (ie. red/green/blue in this case).
+  "outputName": "{name}_{part0}"
+}
+```
+
+#### 2. Build
+`npm run fv-build`
+
+#### 3. After build
+```
+.
++-- _src
+|   +-- _splash
+|       +-- fvi.config.json
+|       +-- fvi.config.json
+|       +-- red.x64.png
+|       +-- red.x128.png
+|       +-- red.x256.png
+|       +-- green.x64.png
+|       +-- green.x128.png
+|       +-- green.x256.png
+|       +-- blue.x64.png
+|       +-- blue.x128.png
+|       +-- blue.x256.png
+|   +-- splash_x64.png
+|   +-- splash_x128.png
+|   +-- splash_x256.png
+|   ...
+```
+
+.gitignore
+```.gitignore
+# file-variants outputs
+splash*.png
 ```
 
 ## License
