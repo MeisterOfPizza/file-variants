@@ -1,5 +1,11 @@
 import * as utils from '../src/utils';
 
+test('uniqueBy', () => {
+    expect(utils.uniqueBy([0, 1, 2, 3, 3])).toEqual([0, 1, 2, 3]);
+    expect(utils.uniqueBy([0, 1, 2, 3, 3], (n) => n)).toEqual([0, 1, 2, 3]);
+    expect(utils.uniqueBy([{ a: 0 }, { a: 1 }, { a: 0 }], (({ a }) => a))).toEqual([{ a: 0 }, { a: 1 }]);
+});
+
 test('consumeFlagArg', () => {
     expect(utils.consumeFlagArg([], 'foo')).toBeFalsy();
     expect(utils.consumeFlagArg(['foo'], 'foo')).toBeTruthy();

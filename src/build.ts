@@ -109,7 +109,9 @@ const main = () => {
                     globalReplacements,
                     verbose,
                 )
-                    .then(({ name, absoluteDestPath }) => utils.logInstruction(`Created output of input "${name}" at ${utils.pathToStr(absoluteDestPath)}.`))
+                    .then(({ name, srcDestPairs }) => utils.logInstruction(
+                        `Created output(s) of input "${name}" at ${srcDestPairs.map(([, dest]) => utils.pathToStr(dest)).join(', ')}.`
+                        ))
                     .catch((err) => utils.logError('Failed creating output, reason:', err))
                     .finally(() => {
                         if (verbose) {

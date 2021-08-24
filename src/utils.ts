@@ -17,6 +17,18 @@ export const logSuccess     = (...args: any[]) => console.log(chalk.green(`SUCCE
 export const logWarning     = (...args: any[]) => console.log(chalk.yellow(`WARN: ${argsToStr(...args)}`));
 export const logError       = (...args: any[]) => console.log(chalk.red(`ERR: ${argsToStr(...args)}`));
 
+export const uniqueBy = <TSource, TSelected>(source: TSource[], selector: ((value: TSource) => TSelected) | null = null): TSource[] => {
+    const lookup: TSelected[] = [];
+    return source.reduce((acc, value) => {
+        const selectedValue = (selector ? selector(value) : value) as TSelected;
+        if (!lookup.includes(selectedValue)) {
+            acc.push(value);
+            lookup.push(selectedValue);
+        }
+        return acc;
+    }, [] as TSource[]);
+};
+
 export const consumeFlagArg = (args: string[], flag: string): boolean => {
     const index = args.indexOf(flag);
     if (index !== -1) {
@@ -55,7 +67,7 @@ export const consumeAllKeyValueArgs = (args: string[], key: string): string[] =>
     return matches;
 };
 
-export const getGlobalConfig = (globalConfigPath: T.ConfigPath): T.GlobalConfig | null => {
+export const getGlobalConfig = (globalConfigPath: T.Path): T.GlobalConfig | null => {
     try {
         const data = fs.readFileSync(globalConfigPath, { encoding: 'utf8' });
         logInstruction(`Read global config at ${pathToStr(globalConfigPath)}.`);
@@ -67,7 +79,7 @@ export const getGlobalConfig = (globalConfigPath: T.ConfigPath): T.GlobalConfig 
 };
 
 export const build = (
-    configPath: T.ConfigPath,
+    configPath: T.Path,
     globalConfig: T.GlobalConfig,
     variant: T.Variant | null,
     include: T.InputName[],
@@ -87,9 +99,9 @@ export const build = (
         verbose,
     )
         .then((buildInfo) => {
-            buildOutput(buildInfo, verbose)
+            buildOutputs(buildInfo, verbose)
                 .then(() => {
-                    replaceInOutput(buildInfo, replacements, globalReplacements, verbose)
+                    replaceInOutputs(buildInfo, replacements, globalReplacements, verbose)
                         .then(() => resolve(buildInfo))
                         .catch(reject);
                 })
@@ -98,7 +110,7 @@ export const build = (
 });
 
 const getBuildInfo = (
-    configPath: T.ConfigPath,
+    configPath: T.Path,
     globalConfig: T.GlobalConfig,
     variant: T.Variant | null,
     include: T.InputName[],
@@ -108,42 +120,58 @@ const getBuildInfo = (
 ) => new Promise<T.BuildInfo>((resolve, reject) => {
     getConfig(configPath, globalConfig, verbose)
         .then((config) => {
-            const name = config.name || path.basename(path.resolve(configPath, '../'));
-            if ((!include.length || include.includes(name)) && !exclude.includes(name)) {
+            const inputName = config.name || path.basename(path.resolve(configPath, '../'));
+            if ((!include.length || include.includes(inputName)) && !exclude.includes(inputName)) {
                 const encoding = config.encoding || 'utf8';
-                getSrcPath(configPath, config, name, variant, overrides, verbose)
-                    .then((srcPath) => {
-                        let outputName = config.outputName || name;
+                getSrcPaths(configPath, config, inputName, variant, overrides, verbose)
+                    .then((srcPaths) => {
+                        let outputName = config.outputName || inputName;
+                        if (outputName.includes('{name}')) {
+                            outputName = outputName.replace('{name}', inputName);
+                        }
                         if (config.marking) {
                             const marking = typeof config.marking === 'string' ? config.marking : DEFAULT_MARKING;
                             if (outputName.includes('{marking}')) {
                                 outputName = outputName.replace('{marking}', marking);
                             } else {
-                                outputName = `${outputName}${marking}`;
+                                outputName += marking;
                             }
                         }
 
-                        const extension = path.extname(srcPath);
-                        const destPath  = path.resolve(configPath, '..', config.outPath !== undefined ? config.outPath : '..', `${outputName}${extension}`);
+                        const destDir = path.resolve(configPath, '..', config.outPath !== undefined ? config.outPath : '..');
+
+                        const srcDestPairs = srcPaths.map((srcPath) => {
+                            const extension = path.extname(srcPath);
+                            const [, ...parts] = path.parse(srcPath).name.split('.');
+                            let name = outputName;
+                            parts.forEach((part, i) => {
+                                const pattern = `{part${i}}`;
+                                if (name.includes(pattern)) {
+                                    name = name.replace(pattern, part);
+                                }
+                            });
+                            return [srcPath, path.resolve(destDir, `${name}${extension}`)];
+                        });
+
                         resolve({
-                            name,
+                            name: inputName,
                             outputName,
                             encoding,
-                            absoluteSrcPath: srcPath,
-                            absoluteDestPath: destPath,
+                            destDir,
+                            srcDestPairs,
                             config,
                         } as T.BuildInfo);
                     })
                     .catch(reject);
             } else {
-                reject(`Did not create output for "${name}" because it wasn't included / was excluded.`);
+                reject(`Did not create output for "${inputName}" because it wasn't included / was excluded.`);
             }
         })
         .catch(reject);
 });
 
 const getConfig = (
-    configPath: T.ConfigPath,
+    configPath: T.Path,
     globalConfig: T.GlobalConfig,
     verbose: boolean,
 ) => new Promise<T.Config>((resolve, reject) => {
@@ -169,173 +197,241 @@ const getConfig = (
         });
 });
 
-const getSrcPath = (
-    configPath: T.ConfigPath,
+const getSrcPaths = (
+    configPath: T.Path,
     config: T.Config,
-    name: T.InputName,
+    inputName: T.InputName,
     variant: T.Variant | null,
     overrides: T.Overrides,
     verbose: boolean,
-) => new Promise<T.OutputPath>((resolve, reject) => {
+) => new Promise<T.Path[]>((resolve, reject) => {
     const searchPath = `${path.resolve(configPath, '..')}/*`;
-    glob(searchPath, (err, filePaths) => {
+    glob(searchPath, (err, fileVariantPaths) => {
         if (err) {
             if (verbose) {
-                logError(`glob(${searchPath}) for files in input "${name}" failed, reason: ${err}.`);
+                logError(`glob(${searchPath}) for files in input "${inputName}" failed, reason: ${err}.`);
             }
-            reject(`Searching for files in input "${name}" failed, reason: ${err}.`);
+            reject(`Searching for files in input "${inputName}" failed, reason: ${err}.`);
         } else {
-            const variantsFound = filePaths
-                .map((filePath) => ({ abs: filePath, ...path.parse(filePath) }))
-                .filter(({ base }) => base !== CONFIG_FILENAME)
-                .map(({ name: pathName, abs }) => ({ variantName: pathName, abs }));
+            const variantPathPairs = fileVariantPaths
+                .map((fvp) => ({ absolute: fvp, ...path.parse(fvp) }))
+                .filter(({ base }) => base !== CONFIG_FILENAME) // Because we get every file inside input, we need to exclude config from file variants
+                .map(({ absolute, name }) => [name.split('.')[0], absolute] as [T.Variant, T.Path]);
+
+            const variants = uniqueBy(variantPathPairs.map(([v]) => v));
 
             if (verbose) {
-                log('Found variants', variantsFound.map(({ variantName }) => variantName), 'for input', `"${name}".`);
-            }
-
-            const variantNames = variantsFound.map(({ variantName }) => variantName);
-
-            let variantToUse = name in overrides ? overrides[name] : variant;
-            if (!variantToUse) {
-                variantToUse = config.default;
-            }
-            if (config.fallbacks) {
-                let iLoopBreak = 100;
-                while (iLoopBreak > 0 && variantToUse !== config.default && !variantNames.includes(variantToUse)) {
-                    variantToUse = config.fallbacks[variantToUse];
-                    iLoopBreak--;
+                if (variants.length > 0) {
+                    log('Found variant(s)', variants.map((v) => `"${v}"`).join(', '), 'for input', `"${inputName}".`);
+                } else {
+                    logError(`Did not find any variants for input "${inputName}".`);
                 }
             }
-            if (!variantNames.includes(variantToUse)) {
+
+            let variantToUse = inputName in overrides ? overrides[inputName] : variant;
+            // If overrides does not contain a variant override AND variant arg was not specified:
+            if (!variantToUse) {
+                variantToUse = config.default;
+            } else if (config.fallbacks) {
+                // Backup break to avoid infinite loops
+                let maxLoopCount = 100;
+                // Keep going until we either run into default OR we find a valid variant (or we break to stop infinite loops):
+                while (maxLoopCount > 0 && variantToUse !== config.default && !variants.includes(variantToUse)) {
+                    variantToUse = config.fallbacks[variantToUse];
+                    maxLoopCount--;
+                }
+            }
+            // If we still haven't found a valid variant, use default:
+            if (!variants.includes(variantToUse)) {
                 variantToUse = config.default;
             }
 
-            if (variantToUse && variantsFound.find(({ variantName }) => variantName === variantToUse)) {
-                const filePath = variantsFound.find(({ variantName }) => variantName === variantToUse)!.abs;
-                resolve(filePath);
+            const srcPaths = variantPathPairs
+                .filter(([v]) => v === variantToUse)
+                .map(([, p]) => p);
+
+            if (srcPaths.length) {
+                if (verbose) {
+                    log(`Using variant "${variantToUse}" to build for input "${inputName}".`);
+                }
+                resolve(srcPaths);
             } else {
-                reject(`Can't find a file variant to use for input "${name}".`);
+                reject(`Can't find a file variant to use for input "${inputName}".`);
             }
         }
     });
 });
 
-const buildOutput = (
+const buildOutputs = (
     buildInfo: T.BuildInfo,
     verbose: boolean,
 ) => new Promise((resolve, reject) => {
-    const dirPath = path.resolve(buildInfo.absoluteDestPath, '..');
+    const {
+        destDir,
+        srcDestPairs,
+    } = buildInfo;
     if (verbose) {
-        log(`Running mkdir (recursive) for output at ${pathToStr(dirPath)}.`);
+        log(`Running mkdir (recursive) for output at ${pathToStr(destDir)}.`);
     }
-    fs.promises.mkdir(dirPath, { recursive: true })
+    fs.promises.mkdir(destDir, { recursive: true })
         .then(() => {
             if (verbose) {
-                logSuccess(`mkdir (recursive) for output at ${pathToStr(dirPath)} succeeded.`);
-                log(`Running copyFile (file-variant -> output) from ${pathToStr(buildInfo.absoluteSrcPath)} to ${pathToStr(buildInfo.absoluteDestPath)}.`);
+                logSuccess(`mkdir (recursive) for output at ${pathToStr(destDir)} succeeded.`);
             }
-            fs.promises.copyFile(buildInfo.absoluteSrcPath, buildInfo.absoluteDestPath)
-                .then(() => {
-                    if (verbose) {
-                        logSuccess(`copyFile from ${pathToStr(buildInfo.absoluteSrcPath)} to ${pathToStr(buildInfo.absoluteDestPath)} succeeded.`);
+            let copyDoneCount    = 0;
+            let copySuccessCount = 0;
+            const handleCopyDone = (success: boolean) => {
+                copyDoneCount++;
+                if (success) {
+                    copySuccessCount++;
+                }
+                if (copyDoneCount === srcDestPairs.length) {
+                    if (copySuccessCount === copyDoneCount) {
+                        resolve(null);
+                    } else {
+                        reject();
                     }
-                    resolve(null);
-                })
-                .catch(reject);
+                }
+            };
+            srcDestPairs.forEach(([src, dest]) => {
+                if (verbose) {
+                    log(`Running copyFile (file-variant -> output) from ${pathToStr(src)} to ${pathToStr(dest)}.`);
+                }
+                fs.promises.copyFile(src, dest)
+                    .then(() => {
+                        if (verbose) {
+                            logSuccess(`copyFile from ${pathToStr(src)} to ${pathToStr(dest)} succeeded.`);
+                        }
+                        handleCopyDone(true);
+                    })
+                    .catch(() => handleCopyDone(false));
+            });
         })
         .catch((err) => {
             if (verbose) {
-                logError(`mkdir (recursive) for output at ${pathToStr(dirPath)} failed, reason: ${err}.`);
+                logError(`mkdir (recursive) for output at ${pathToStr(destDir)} failed, reason: ${err}.`);
             }
-            reject(`Can't create directory at ${pathToStr(dirPath)}, reason: ${err}.`);
+            reject(`Can't create directory at ${pathToStr(destDir)}, reason: ${err}.`);
         });
 });
 
-export const replaceInOutput = (
+export const replaceInOutputs = (
     buildInfo: T.BuildInfo,
     replacements: T.Replacements,
     globalReplacements: T.GlobalReplacements,
     verbose: boolean,
 ) => new Promise((resolve, reject) => {
-    const destPath = buildInfo.absoluteDestPath;
-    const encoding = buildInfo.encoding;
+    const {
+        srcDestPairs,
+    } = buildInfo;
     if (buildInfo.config.useGlobalReplacements || replacements[buildInfo.name]) {
-        if (verbose) {
-            log(`Running readFile of output at ${pathToStr(destPath)}.`);
-        }
-        // @ts-ignore
-        fs.promises.readFile(destPath, { encoding })
-            .then((data) => {
-                if (encoding === 'ascii'
-                    || encoding === 'utf8'
-                    || encoding === 'utf-8'
-                    || encoding === 'latin1') {
-                    if (verbose) {
-                        log(`Trying to replace in output at ${pathToStr(destPath)}.`);
-                    }
-
-                    const foundReplacements = [];
-                    // Add all file specific replaces:
-                    if (buildInfo.name in replacements) {
-                        foundReplacements.push(...Object.entries(replacements[buildInfo.name]));
-                    }
-                    // Add global replaces:
-                    if (buildInfo.config.useGlobalReplacements) {
-                        const globalReplaceEntries = Object.entries(globalReplacements);
-                        if (buildInfo.config.useGlobalReplacements === true) {
-                            foundReplacements.push(...globalReplaceEntries);
-                        } else {
-                            foundReplacements.push(
-                                ...globalReplaceEntries.filter(([keyword]) => (
-                                    buildInfo.config.useGlobalReplacements as string[]).includes(keyword)
-                                )
-                            );
-                        }
-                    }
-                    let replacementCount = 0;
-                    // Replace all occurrences of keyword with replacement:
-                    foundReplacements.forEach(([keyword, replacement]) => {
-                        const keywordRegExp = new RegExp(keyword, 'gm');
-                        // @ts-ignore
-                        if (keywordRegExp.test(data)) {
-                            if (verbose) {
-                                log(`Replaced "${keyword}" with "${replacement}" in output at ${pathToStr(destPath)}.`)
-                            }
-                            // @ts-ignore
-                            data = data.replace(keywordRegExp, replacement);
-                            replacementCount++;
-                        }
-                    });
-
-                    fs.promises.writeFile(destPath, data, { encoding })
-                        .then(() => {
-                            if (verbose) {
-                                logSuccess(`Completed ${replacementCount} replacement(s) in output at ${pathToStr(destPath)}.`);
-                            }
-                            resolve(null);
-                        })
-                        .catch((err) => {
-                            if (verbose) {
-                                logError(`writeFile to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
-                            }
-                            reject(`writeFile to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
-                        });
-                } else {
-                    logWarning(`Did not replace in output at ${pathToStr(destPath)} because it had the wrong encoding (although still had valid replacements/global-replacements).`);
+        let replaceDoneCount    = 0;
+        let replaceSuccessCount = 0;
+        const handleReplaceDone = (success: boolean) => {
+            replaceDoneCount++;
+            if (success) {
+                replaceSuccessCount++;
+            }
+            if (replaceDoneCount === srcDestPairs.length) {
+                if (replaceSuccessCount === replaceDoneCount) {
                     resolve(null);
+                } else {
+                    reject();
                 }
-            })
-            .catch((err) => {
-                if (verbose) {
-                    logError(`readFile of output at ${pathToStr(destPath)} failed, reason: ${err}.`);
-                }
-                reject(`Reading output of input "${buildInfo.name}" at ${pathToStr(destPath)} failed, reason: ${err}.`);
-            });
+            }
+        };
+        srcDestPairs.forEach(([, dest]) => {
+            replaceInOutput(dest, buildInfo, replacements, globalReplacements, verbose)
+                .then(() => handleReplaceDone(true))
+                .catch(() => handleReplaceDone(false));
+        })
     } else {
         if (verbose) {
-            log(`Did not replace in output at ${pathToStr(destPath)}.`);
+            log(`Did not replace in any output of input "${buildInfo.name}".`);
         }
         resolve(null);
     }
+});
+
+export const replaceInOutput = (
+    destPath: T.Path,
+    buildInfo: T.BuildInfo,
+    replacements: T.Replacements,
+    globalReplacements: T.GlobalReplacements,
+    verbose: boolean,
+) => new Promise((resolve, reject) => {
+    const {
+        encoding,
+    } = buildInfo;
+    if (verbose) {
+        log(`Running readFile of output at ${pathToStr(destPath)}.`);
+    }
+    // @ts-ignore
+    fs.promises.readFile(destPath, { encoding })
+        .then((data) => {
+            if (encoding === 'ascii'
+                || encoding === 'utf8'
+                || encoding === 'utf-8'
+                || encoding === 'latin1') {
+                if (verbose) {
+                    log(`Trying to replace in output at ${pathToStr(destPath)}.`);
+                }
+
+                const foundReplacements = [];
+                // Add all file specific replaces:
+                if (buildInfo.name in replacements) {
+                    foundReplacements.push(...Object.entries(replacements[buildInfo.name]));
+                }
+                // Add global replaces:
+                if (buildInfo.config.useGlobalReplacements) {
+                    const globalReplaceEntries = Object.entries(globalReplacements);
+                    if (buildInfo.config.useGlobalReplacements === true) {
+                        foundReplacements.push(...globalReplaceEntries);
+                    } else {
+                        foundReplacements.push(
+                            ...globalReplaceEntries.filter(([keyword]) => (
+                                buildInfo.config.useGlobalReplacements as string[]).includes(keyword)
+                            )
+                        );
+                    }
+                }
+                let replacementCount = 0;
+                // Replace all occurrences of keyword with replacement:
+                foundReplacements.forEach(([keyword, replacement]) => {
+                    const keywordRegExp = new RegExp(keyword, 'gm');
+                    // @ts-ignore
+                    if (keywordRegExp.test(data)) {
+                        if (verbose) {
+                            log(`Replaced "${keyword}" with "${replacement}" in output at ${pathToStr(destPath)}.`)
+                        }
+                        // @ts-ignore
+                        data = data.replace(keywordRegExp, replacement);
+                        replacementCount++;
+                    }
+                });
+
+                fs.promises.writeFile(destPath, data, { encoding })
+                    .then(() => {
+                        if (verbose) {
+                            logSuccess(`Completed ${replacementCount} replacement(s) in output at ${pathToStr(destPath)}.`);
+                        }
+                        resolve(null);
+                    })
+                    .catch((err) => {
+                        if (verbose) {
+                            logError(`writeFile to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
+                        }
+                        reject(`Writing to output at ${pathToStr(destPath)} failed, reason: ${err}.`);
+                    });
+            } else {
+                logWarning(`Did not replace in output at ${pathToStr(destPath)} because it had the wrong encoding (although still had valid replacements/global-replacements).`);
+                resolve(null);
+            }
+        })
+        .catch((err) => {
+            if (verbose) {
+                logError(`readFile of output at ${pathToStr(destPath)} failed, reason: ${err}.`);
+            }
+            reject(`Reading output of input "${buildInfo.name}" at ${pathToStr(destPath)} failed, reason: ${err}.`);
+        });
 });
