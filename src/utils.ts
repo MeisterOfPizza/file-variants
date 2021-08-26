@@ -38,7 +38,7 @@ export const consumeFlagArg = (args: string[], flag: string): boolean => {
 };
 
 export const consumeKeyValueArg = (args: string[], key: string): string | null => {
-    const pattern = `^${key}=[^ ]*$`;
+    const pattern = `^${key}=.*$`;
     if (args && key) {
         for (let i = 0; i < args.length; i++) {
             const arg = args[i];
@@ -53,7 +53,7 @@ export const consumeKeyValueArg = (args: string[], key: string): string | null =
 
 export const consumeAllKeyValueArgs = (args: string[], key: string): string[] => {
     const matches = [];
-    const pattern = `^${key}=[^ ]*$`;
+    const pattern = `^${key}=.*$`;
     if (args && key) {
         const tmpArgs = [...args];
         for (let i = 0; i < tmpArgs.length; i++) {
