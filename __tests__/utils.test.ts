@@ -23,6 +23,8 @@ test('consumeKeyValueArg', () => {
     expect(utils.consumeKeyValueArg(['foo', 'bar', 'x=0'], 'foo')).toBeNull();
     expect(utils.consumeKeyValueArg(['foo', 'bar', 'x=0'], 'boo')).toBeNull();
 
+    expect(utils.consumeKeyValueArg(['foo', 'bar', 'x-y=foo bar buzz'], 'x-y')).toBe('foo bar buzz');
+
     const args0_0 = ['foo', 'bar', 'x=0', 'x=1'];
     const args0_1 = [...args0_0];
     expect(utils.consumeKeyValueArg(args0_0, 'x')).toBe('0');
@@ -42,6 +44,8 @@ test('consumeAllKeyValueArgs', () => {
     expect(utils.consumeAllKeyValueArgs(['foo', 'bar', 'y=1', 'x=0'], 'x')).toEqual(['0']);
     expect(utils.consumeAllKeyValueArgs(['foo', 'bar', 'x=0'], 'foo')).toEqual([]);
     expect(utils.consumeAllKeyValueArgs(['foo', 'bar', 'x=0'], 'boo')).toEqual([]);
+
+    expect(utils.consumeAllKeyValueArgs(['x-y', 'foo', 'x-y=a', 'bar', 'x-y=foo bar buzz', 'x-y=a b'], 'x-y')).toEqual(['a', 'foo bar buzz', 'a b']);
 
     const args0 = ['foo', 'bar', 'x=0', 'x=1'];
     expect(utils.consumeAllKeyValueArgs(args0, 'x')).toEqual(['0', '1']);
