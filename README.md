@@ -105,6 +105,7 @@ interface Config {
   };
   useGlobalReplacements?: boolean | string[];
   marking?: boolean | string;
+  exclude?: string;
 }
 ```
 * **default** (required): the default variant to use as fallback if all else fails.
@@ -124,6 +125,7 @@ interface Config {
   * Unprovided/false: output will not be marked.
   * True: will append ".fvo" (not extension) to outputName.
   * String: will append given string to outputName OR replace keyword "{marking}" inside outputName.
+* `exclude`: which file variants to exclude (regex). Matches entire filename (including variant).
 
 ### File variants
 * **type**: .* (output will use the same extension as selected file variant)

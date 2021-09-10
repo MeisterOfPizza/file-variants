@@ -15,6 +15,7 @@ export interface Config {
     };
     useGlobalReplacements?: boolean | string[];
     marking?: boolean | string;
+    exclude?: string;
 }
 
 export interface GlobalConfig {
