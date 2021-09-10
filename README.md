@@ -45,6 +45,10 @@ Now run `npm run fv-build` (or `npx file-variants build`)
     - [1. Before build](#1-before-build-2)
     - [2. Build](#2-build-2)
     - [3. After build](#3-after-build-2)
+  - [Example 4](#example-4)
+    - [1. Before build](#1-before-build-3)
+    - [2. Build](#2-build-3)
+    - [3. After build](#3-after-build-3)
 - [License](#license)
 
 ## Usage
@@ -314,6 +318,58 @@ fvi.config.json
 ```.gitignore
 # file-variants outputs
 splash*.png
+```
+
+### Example 4
+1. You have different configs and a README for each.
+2. You don't want the READMEs to also be outputted.
+
+#### 1. Before build
+```
+.
++-- _src
+|   +-- _config
+|       +-- fvi.config.json
+|       +-- A.ini
+|       +-- A.README.md
+|       +-- B.ini
+|       +-- B.README.md
+|       +-- C.ini
+|       +-- C.README.md
+|   ...
+```
+
+fvi.config.json
+```json
+{
+  "default": "A",
+  "exclude": "README"
+}
+```
+
+#### 2. Build
+`npm run fv-build`
+
+#### 3. After build
+```
+.
++-- _src
+|   +-- _config
+|       +-- fvi.config.json
+|       +-- A.ini
+|       +-- A.README.md
+|       +-- B.ini
+|       +-- B.README.md
+|       +-- C.ini
+|       +-- C.README.md
+|   +-- config.ini  # No README as output!
+|   ...
+```
+
+.gitignore
+```.gitignore
+# file-variants outputs
+config.ini
 ```
 
 ## License

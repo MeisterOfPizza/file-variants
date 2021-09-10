@@ -1,0 +1,10 @@
+{
+  "name": "example-4",
+  "version": "1.0.0",
+  "scripts": {
+    "fv-build": "file-variants build"
+  },
+  "dependencies": {
+    "file-variants": "*"
+  }
+}
