@@ -283,7 +283,7 @@ fvi.config.json
 ```json
 {
   "default": "red",
-  "//": "{part0} (pattern {part\d*}) means the first part of the",
+  "//": "{part0} (pattern {part}\\d*} with only one (1) backslash) means the first part of the",
   "//": "filename after variant (ie. red/green/blue in this case).",
   "outputName": "{name}_{part0}"
 }
@@ -361,7 +361,7 @@ fvi.config.json
 |       +-- B.README.md
 |       +-- C.ini
 |       +-- C.README.md
-|   +-- config.ini  # No README as output!
+|   +-- config.ini # No README as output!
 |   ...
 ```
 
