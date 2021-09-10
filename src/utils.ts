@@ -213,9 +213,12 @@ const getSrcPaths = (
             }
             reject(`Searching for files in input "${inputName}" failed, reason: ${err}.`);
         } else {
+            const configExcludeRegExp = config.exclude && new RegExp(config.exclude);
+
             const variantPathPairs = fileVariantPaths
                 .map((fvp) => ({ absolute: fvp, ...path.parse(fvp) }))
                 .filter(({ base }) => base !== CONFIG_FILENAME) // Because we get every file inside input, we need to exclude config from file variants
+                .filter(({ base }) => !configExcludeRegExp || !configExcludeRegExp.test(base))
                 .map(({ absolute, name }) => [name.split('.')[0], absolute] as [T.Variant, T.Path]);
 
             const variants = uniqueBy(variantPathPairs.map(([v]) => v));

@@ -45,6 +45,10 @@ Now run `npm run fv-build` (or `npx file-variants build`)
     - [1. Before build](#1-before-build-2)
     - [2. Build](#2-build-2)
     - [3. After build](#3-after-build-2)
+  - [Example 4](#example-4)
+    - [1. Before build](#1-before-build-3)
+    - [2. Build](#2-build-3)
+    - [3. After build](#3-after-build-3)
 - [License](#license)
 
 ## Usage
@@ -105,25 +109,27 @@ interface Config {
   };
   useGlobalReplacements?: boolean | string[];
   marking?: boolean | string;
+  exclude?: string;
 }
 ```
-* **default** (required): the default variant to use as fallback if all else fails.
-* **name**: name of input. If left empty the input directory's name will be used instead.
-* **outputName**: name of output (excluding extension). If left empty **name** will be used instead.
-* **encoding**: common encoding of all file variants. If left empty, `utf8` will be used. However, **encoding** only matters if replacements are being used on the output. If replacements are provided and are to be used, **encoding** must be any of the following values: `ascii`, `utf8`, `utf-8`, or `latin1`.
-* **outPath**: relative (from input's path) path to place output at.
+* `default` (required): the default variant to use as fallback if all else fails.
+* `name`: name of input. If left empty the input directory's name will be used instead.
+* `outputName`: name of output (excluding extension). If left empty, `name` will be used instead.
+* `encoding`: common encoding of all file variants. If left empty, `utf8` will be used. However, `encoding` only matters if replacements are being used on the output. If replacements are provided and are to be used, `encoding` must be any of the following values: `ascii`, `utf8`, `utf-8`, or `latin1`.
+* `outPath`: relative (from input's path) path to place output at.
   * Unprovided: output will be placed on the same level as input.
   * Empty: output will be placed inside input.
   * Otherwise: relative from path of input.
-* **fallbacks**: a map of variant to variant fallbacks. If a variant isn't detected inside input, but is detected inside **fallbacks** as a key, the corresponding key's value will be used as the variant instead. This will be done recursively until a valid file variant is found, or until no fallbacks remain, in which case **default** will be used as a variant instead.
-* **useGlobalReplacements**: control what keywords should be replaced by *global-replace(s)* (option).
+* `fallbacks`: a map of variant to variant fallbacks. If a variant isn't detected inside input, but is detected inside `fallbacks` as a key, the corresponding key's value will be used as the variant instead. This will be done recursively until a valid file variant is found, or until no fallbacks remain, in which case `default` will be used as a variant instead.
+* `useGlobalReplacements`: control what keywords should be replaced by *global-replace(s)* (option).
   * Unprovided/false: output will not receive any replacements from *global-replace(s)*.
   * True: output will use replacements from all found global replaces.
   * Array: output will *only* use replacements found both in *global-replace(s)* *and* provided array.
-* **marking**: mark the output to ignore changes more easily.
+* `marking`: mark the output to ignore changes more easily.
   * Unprovided/false: output will not be marked.
   * True: will append ".fvo" (not extension) to outputName.
   * String: will append given string to outputName OR replace keyword "{marking}" inside outputName.
+* `exclude`: which file variants to exclude (regex). Matches entire filename (including variant).
 
 ### File variants
 * **type**: .* (output will use the same extension as selected file variant)
@@ -277,8 +283,8 @@ fvi.config.json
 ```json
 {
   "default": "red",
-  // {part0} (pattern {part\d*}) means the first part of the
-  // filename after variant (ie. red/green/blue in this case).
+  "//": "{part0} (pattern {part}\\d*} with only one (1) backslash) means the first part of the",
+  "//": "filename after variant (ie. red/green/blue in this case).",
   "outputName": "{name}_{part0}"
 }
 ```
@@ -291,7 +297,6 @@ fvi.config.json
 .
 +-- _src
 |   +-- _splash
-|       +-- fvi.config.json
 |       +-- fvi.config.json
 |       +-- red.x64.png
 |       +-- red.x128.png
@@ -312,6 +317,58 @@ fvi.config.json
 ```.gitignore
 # file-variants outputs
 splash*.png
+```
+
+### Example 4
+1. You have different configs and a README for each.
+2. You don't want the READMEs to also be outputted.
+
+#### 1. Before build
+```
+.
++-- _src
+|   +-- _config
+|       +-- fvi.config.json
+|       +-- A.ini
+|       +-- A.README.md
+|       +-- B.ini
+|       +-- B.README.md
+|       +-- C.ini
+|       +-- C.README.md
+|   ...
+```
+
+fvi.config.json
+```json
+{
+  "default": "A",
+  "exclude": "README"
+}
+```
+
+#### 2. Build
+`npm run fv-build`
+
+#### 3. After build
+```
+.
++-- _src
+|   +-- _config
+|       +-- fvi.config.json
+|       +-- A.ini
+|       +-- A.README.md
+|       +-- B.ini
+|       +-- B.README.md
+|       +-- C.ini
+|       +-- C.README.md
+|   +-- config.ini # No README as output!
+|   ...
+```
+
+.gitignore
+```.gitignore
+# file-variants outputs
+config.ini
 ```
 
 ## License
